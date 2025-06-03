@@ -1,7 +1,12 @@
 {
   "name": "stream-mint-extractor",
   "version": "1.0.0",
+  "type": "module",
   "description": "Download & split YouTube video to equal chunks and extract metadata",
+  "scripts": {
+    "dev": "npx trigger.dev@latest dev --skip-telemetry",
+    "deploy": "npx trigger.dev@latest deploy --skip-telemetry --self-hosted --push --registry dist.majus.org --namespace trigger"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/imajus/stream-mint.git"
@@ -13,6 +18,9 @@
   },
   "homepage": "https://github.com/imajus/stream-mint#readme",
   "dependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "fs-extra": "^11.3.0",
+    "ytdl-core": "^4.11.5",
     "zod": "^3.25.49"
   }
 }
