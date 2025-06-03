@@ -1,0 +1,77 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Xsolla ZK Starter Kit Project Rules
+
+This project is a Xsolla ZK Starter Kit as documented in [README.md](mdc:README.md).
+
+## Project Overview
+
+This is a **Hardhat zkSync + Foundry zkSync hybrid project** with horizontally growing architecture of tasks, stages and fixtures. It integrates Hardhat Ignition + Hardhat zkSync Deploy for parallel usage.
+
+## Prerequisites
+
+- Latest version of `foundry`
+- Latest version of `foundry-zksync` 
+- Latest version of `yarn`
+
+## Module Export Conventions
+
+**Important**: Every folder except `./contracts` is considered a module:
+- **Modules**: Must use `export default` operators
+- **Libraries**: Should use `export` operator (for collections of methods)
+
+## Project Structure
+
+### Core Directories
+
+- **`./contracts/utils`** - Pre-defined contracts library with 3 types of token fabrics: EIP20, EIP721, EIP1155
+- **`./zk-deploy`** - Main Hardhat zkSync Deploy folder
+  - `./zk-deploy/fixtures` - zkSync Deploy scripts for `inMemoryNode` network only (supports impersonalization and time travel)
+  - `./zk-deploy/stages` - zkSync Deploy scripts as building blocks for local artifact deployment
+- **`./scripts/solidity`** - Standard Foundry scripts folder
+- **`./scripts/typescript`** - External scripts (helpers and reusable stages)
+
+### TypeScript Helpers Structure
+
+- **`./typescript/helpers`** - General helper functions (each function must accept all dependencies through arguments only)
+  - `./typescript/helpers/eip712` - EIP712 signatures manipulation via OpenZeppelin `ForwardRequest`s
+  - `./typescript/helpers/impersonating.helper` - Testing functions with impersonated signers
+  - `./typescript/helpers/utils.helper` - Event decoding and address report functions
+  - `./typescript/helpers/opensea.helper` - OpenSea-like marketplace conduit management
+  - `./typescript/helpers/zkSync.helper` - Xsolla ZK interactions (deployments, verification, artifacts)
+- **`./typescript/reusables`** - Collections of fabrics for modules or stages
+
+### Testing Structure
+
+- **`./test`** - Tests can contain any modules (Hardhat Ignition, Hardhat zkSync Deploy, or Foundry) but **cannot overlap**
+  - `./test/typescript` - Hardhat tests
+  - `./test/solidity` - Foundry tests
+
+## Key Commands
+
+### Foundry zkSync
+```bash
+forge build --zksync
+```
+
+### Custom Hardhat Tasks
+```bash
+npx hardhat verifyAllZk    # Verify all locally developed artifacts against zkSync network
+npx hardhat zkAddresses    # Generate ADDRESSES.md report with newest addresses from zkSync networks
+```
+
+### Standard Commands
+```bash
+yarn                       # Install dependencies
+```
+
+## Development Guidelines
+
+1. **Helper Functions**: Must accept all dependencies through function arguments only
+2. **Module Structure**: Follow the export conventions based on folder type
+3. **Testing**: Ensure no overlap between different test module types
+4. **Deployment**: Use stages as building blocks for artifact deployment and configuration
+5. **Fixtures**: Only use fixtures with `inMemoryNode` network for testing scenarios

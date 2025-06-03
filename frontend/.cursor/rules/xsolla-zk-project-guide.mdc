@@ -1,0 +1,86 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Xsolla ZK App Starter Kit - Development Guide
+
+## Project Overview
+This is a React/Next.js application built with the Xsolla ZK UI Design System. The project uses TypeScript, Tamagui for UI optimization, and follows a token-based design system approach.
+
+## Key Technologies
+- **Xsolla ZK UI** - Primary design system and component library
+- **Tamagui** - Universal UI system with optimizing compiler
+- **Next.js** - React framework with App Router
+- **TypeScript** - For type safety (though prefer JavaScript when there's choice per user preference)
+
+## Project Structure
+- `app/` - Next.js App Router pages
+- `src/tamagui/` - Tamagui configuration and generated tokens
+- `raw-tokens/` - Source design tokens from Figma
+- `raw-icons/` - Source icon assets
+- [package.json](mdc:package.json) - Dependencies and scripts
+- [next.config.mjs](mdc:next.config.mjs) - Next.js build configuration
+
+## Development Commands
+- `pnpm dev` - Start development server
+- `pnpm build` - Build for production
+- `pnpm start` - Start production server
+- `pnpm export` - Build and export static files
+- `pnpm generate:tokens` - Generate design tokens from raw-tokens/
+- `pnpm generate:icons` - Generate icon components from raw-icons/
+
+## Design System Usage
+
+### Component Import Pattern
+```javascript
+import { Button, Text, View } from '@xsolla-zk/react';
+```
+
+### Design Token Usage
+- Use semantic tokens: `$content.neutral-primary`
+- Size tokens: `$200`, `$400`, `$600` etc.
+- Responsive props: `$md={{ padding: '$400' }}`
+
+### Color System
+- **Content**: Text and foreground colors
+- **Background**: Surface and container colors  
+- **Brand**: Primary (green) and secondary (purple)
+- **Semantic**: Success, warning, error, info
+
+### Responsive Breakpoints
+- `$sm`: 640px
+- `$md`: 768px  
+- `$lg`: 1024px
+- `$xl`: 1280px
+
+## Best Practices
+
+### ✅ Recommended Patterns
+```javascript
+// Use semantic design tokens
+<Text color="$content.neutral-primary">
+
+// Leverage responsive props
+<View padding="$200" $md={{ padding: '$400' }}>
+
+// Follow component variants
+<Button size="$400" variant="contained">
+```
+
+### Code Style Preferences
+- Prefer JavaScript over TypeScript when there's a choice
+- No empty lines for styling inside functions
+- Use empty lines outside functions where applicable
+
+## Asset Generation Workflow
+1. Place raw tokens in `raw-tokens/` directory
+2. Place SVG icons in `raw-icons/` directory  
+3. Run `pnpm generate:tokens` to create TypeScript token definitions
+4. Run `pnpm generate:icons` to create optimized React components
+
+## Architecture Notes
+- Web-first approach with SSG/SSR support
+- Tamagui compiler for static style extraction
+- Tree shaking for optimal bundling
+- Full TypeScript integration for design tokens
