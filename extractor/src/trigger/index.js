@@ -150,6 +150,43 @@ async function uploadToIPFS(filePath, fileName) {
   }
 }
 
+// Calculate score for a chunk based on overlapping periods
+function calculateChunkScore(chunkStart, chunkEnd, periods) {
+  if (!periods || periods.length === 0) {
+    return 0;
+  }
+  let maxScore = 0;
+  for (const period of periods) {
+    const overlapStart = Math.max(chunkStart, period.start);
+    const overlapEnd = Math.min(chunkEnd, period.end);
+    const overlapDuration = Math.max(0, overlapEnd - overlapStart);
+    if (overlapDuration > 0) {
+      const overlapRatio = overlapDuration / period.duration;
+      const weightedScore = period.score * overlapRatio;
+      if (weightedScore > maxScore) {
+        maxScore = weightedScore;
+      }
+    }
+  }
+  return maxScore;
+}
+
+// Fetch periods with scores from n8n HTTP API
+async function fetchPeriods(link, threshold) {
+  try {
+    const n8nUrl = `https://n8n.majus.org/webhook/e12ca792-0ff5-46a4-bfc9-b3f89d1f3313?link=${encodeURIComponent(link)}&threshold=${encodeURIComponent(threshold)}`;
+    const response = await fetch(n8nUrl);
+    if (!response.ok) {
+      throw new Error(`n8n API request failed: ${response.status} ${response.statusText}`);
+    }
+    const { periods } = await response.json();
+    return periods;
+  } catch (err) {
+    logger.error("Failed to fetch periods from n8n API", { error: err.message });
+    throw err;
+  }
+}
+
 export const extractTask = schemaTask({
   id: "extract-task",
   schema: z.object({
@@ -158,11 +195,14 @@ export const extractTask = schemaTask({
     threshold: z.number(),
   }),
   run: async (payload, { ctx }) => {
-    logger.info("Starting video extraction task", { payload });
-
-    const { link, chunks } = payload;
+    const { link, chunks, threshold } = payload;
     const tempDir = path.join(__dirname, "temp", ctx.run.id);
     const videoPath = path.join(tempDir, "video.mp4");
+    logger.info("Starting video extraction task", { payload });
+
+    // Make HTTP GET request to n8n endpoint to get periods with scores
+    const periods = await fetchPeriods(link, threshold);
+    logger.info("Received periods from n8n API", periods);
 
     await fs.ensureDir(tempDir);
     logger.info("Temporary directory created", { tempDir });
@@ -186,12 +226,13 @@ export const extractTask = schemaTask({
     // Get video duration from the API response
     const totalDuration = videoDetails.lengthSeconds;
     const chunkDuration = totalDuration / chunks;
-    const ipfsUploads = [];
+    const items = [];
 
     logger.info("Starting GIF conversion...", { chunks, chunkDuration });
 
     for (let i = 0; i < chunks; i++) {
       const startTime = i * chunkDuration;
+      const endTime = startTime + chunkDuration;
       const outputGifPath = path.join(tempDir, `chunk-${i}.gif`);
       
       logger.info(`Processing chunk ${i + 1}/${chunks}`, { startTime, duration: chunkDuration });
@@ -228,13 +269,15 @@ export const extractTask = schemaTask({
       try {
         const fileName = `chunk-${i}.gif`;
         const ipfsResult = await uploadToIPFS(outputGifPath, fileName);
-        ipfsUploads.push({
-          chunkIndex: i,
-          fileName,
-          localPath: outputGifPath,
-          ...ipfsResult
-        });
         logger.info(`Chunk ${i + 1} uploaded to IPFS`, ipfsResult);
+        // Calculate score for this chunk based on period overlaps
+        const chunkScore = calculateChunkScore(startTime, endTime, periods);
+        items.push({
+          hash: ipfsResult.ipfsHash,
+          start: startTime,
+          end: endTime,
+          score: chunkScore
+        });
       } catch (uploadError) {
         logger.error(`Failed to upload chunk ${i + 1} to IPFS`, { 
           error: uploadError.message 
@@ -244,11 +287,9 @@ export const extractTask = schemaTask({
     }
 
     logger.info("All chunks converted to GIF successfully", { 
-      ipfsUploadsCount: ipfsUploads.length 
+      ipfsUploadsCount: items.length 
     });
     
-    return {
-      ipfsUploads: ipfsUploads.map(upload => upload.ipfsHash),
-    };
+    return { items };
   },
 });
