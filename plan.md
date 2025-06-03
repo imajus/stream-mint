@@ -1,10 +1,10 @@
 ## Day 1 Morning (3–4 h)
 
-- [ ] **Repo & env setup**
+- [x] **Repo & env setup**
   - Initialize monorepo (contracts / backend / frontend)
   - Configure env vars: Pinata API key, YouTube-replay API URL, Flare & Xsolla RPC keys, private keys
   - Install core deps: Hardhat, ethers.js, React, Next.js (or CRA), Node.js libs (ytdl-core, ffmpeg-static, pinata-sdk)
-- [ ] **YouTube video extractor & IPFS upload**
+- [x] **YouTube video extractor & IPFS upload**
   - CLI script: download via ytdl-core, split into N WebM chunks (ffmpeg)
   - Pin chunks to IPFS (Pinata SDK) → output JSON manifest of URIs
 - [ ] **ERC-721 NFT contract**
