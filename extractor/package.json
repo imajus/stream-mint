@@ -1,0 +1,18 @@
+{
+  "name": "stream-mint-extractor",
+  "version": "1.0.0",
+  "description": "Download & split YouTube video to equal chunks and extract metadata",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/imajus/stream-mint.git"
+  },
+  "author": "Denis Perov <denis.perov@gmail.com>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/imajus/stream-mint/issues"
+  },
+  "homepage": "https://github.com/imajus/stream-mint#readme",
+  "dependencies": {
+    "zod": "^3.25.49"
+  }
+}
