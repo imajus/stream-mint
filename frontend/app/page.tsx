@@ -2,17 +2,25 @@
 
 import { Grid2x2 } from '@xsolla-zk/icons';
 import { getSafeTokenValue, RichIcon, SemanticText, Stack, Input, Button } from '@xsolla-zk/react';
-import type { IconProp, RichIconSizes } from '@xsolla-zk/react';
 import { useRouter } from 'next/navigation';
 import { memo, useState } from 'react';
 import { Path, Svg } from 'react-native-svg';
+import type { IconProp, RichIconSizes } from '@xsolla-zk/react';
 import { ContentStack } from '~/components/stacks/content-stack';
-import { useCreateCollection, useNewCollectionEvents, useNFTContractMetadata } from '~/contracts/hooks';
+import {
+  useCreateCollection,
+  useNewCollectionEvents,
+  useNFTContractMetadata,
+} from '~/contracts/hooks';
 
 const Logo1 = memo(LogoXSollaZK) as IconProp;
 
 function CollectionCard({ contractAddress, index }: { contractAddress: string; index: number }) {
+  const router = useRouter();
   const { metadata, isLoading } = useNFTContractMetadata(contractAddress);
+  const handleCardPress = () => {
+    router.push(`/collection?address=${contractAddress}`);
+  };
   return (
     <Stack
       borderRadius="$radius.300"
@@ -21,6 +29,9 @@ function CollectionCard({ contractAddress, index }: { contractAddress: string; i
       padding="$space.300"
       backgroundColor="$layer.floor-0"
       gap="$space.200"
+      pressStyle={{ backgroundColor: '$layer.floor-1' }}
+      onPress={handleCardPress}
+      cursor="pointer"
     >
       <SemanticText variant="paragraphS" fontWeight="600">
         {isLoading ? `Collection #${index + 1}` : metadata?.name || `Collection #${index + 1}`}
@@ -39,7 +50,8 @@ function CollectionCard({ contractAddress, index }: { contractAddress: string; i
               Symbol: {metadata.symbol}
             </SemanticText>
             <SemanticText variant="paragraphS" color="$content.neutral-secondary">
-              Supply: {metadata.totalSupply?.toString() || '0'} / {metadata.maxSupply?.toString() || '0'}
+              Minted: {metadata.totalSupply?.toString() || '0'} /{' '}
+              {metadata.maxSupply?.toString() || '0'}
             </SemanticText>
             <SemanticText variant="paragraphS" color="$content.neutral-secondary">
               Video: {metadata.videoUrl}
