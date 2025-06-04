@@ -22,6 +22,7 @@
     "fs-extra": "^11.3.0",
     "ipfs-only-hash": "^4.0.0",
     "node-libcurl": "^4.1.0",
+    "viem": "^2.30.6",
     "ytdl-core": "^4.11.5",
     "zod": "^3.25.49"
   }

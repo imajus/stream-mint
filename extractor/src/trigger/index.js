@@ -7,6 +7,10 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { promisify } from "util";
 import { Curl } from 'node-libcurl';
+import { createPublicClient, createWalletClient, http } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
+import { mainnet } from 'viem/chains';
+import StreamMintNFTArtifact from '../abis/StreamMintNFT.json' assert { type: 'json' };
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -14,10 +18,105 @@ const __dirname = dirname(__filename);
 // Environment variables for Pinata
 const PINATA_JWT = process.env.PINATA_JWT;
 
+// Environment variable for private key
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
+
 const CURL_TIMEOUT = process.env.CURL_TIMEOUT ?? 3 * 60 * 60;
+
+const SCORE_THRESHOLD = process.env.SCORE_THRESHOLD ?? 0.3;
 
 if (!PINATA_JWT) {
   throw new Error('PINATA_JWT environment variable is required');
+}
+
+if (!PRIVATE_KEY) {
+  throw new Error('PRIVATE_KEY environment variable is required');
+}
+
+// Define the chain configuration once to reuse it
+const xsollaChain = {
+  id: 555272,
+  name: 'Xsolla ZK Sepolia Testnet',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'Ethereum',
+    symbol: 'ETH',
+  },
+  rpcUrls: {
+    default: {
+      http: ['https://zkrpc.xsollazk.com'],
+    },
+  },
+  blockExplorers: {
+    default: {
+      name: 'Xsolla Explorer',
+      url: 'https://x.la/explorer',
+    },
+  },
+  testnet: true,
+};
+
+// Ethereum client setup
+const client = createPublicClient({
+  chain: xsollaChain,
+  transport: http()
+});
+
+// Create wallet client for transaction signing
+const account = privateKeyToAccount(PRIVATE_KEY);
+const walletClient = createWalletClient({
+  account,
+  chain: xsollaChain,
+  transport: http()
+});
+
+// Use the StreamMintNFT ABI from the imported artifact
+const streamMintNFTAbi = StreamMintNFTArtifact.abi;
+
+// Function to read NFT metadata from StreamMintNFT blockchain contract
+async function readNFTMetadata(nftAddress) {
+  try {
+    logger.info("Reading StreamMintNFT metadata from blockchain", { nftAddress });
+    
+    // Read maxSupply from the contract
+    const maxSupply = await client.readContract({
+      address: nftAddress,
+      abi: streamMintNFTAbi,
+      functionName: 'maxSupply'
+    });
+    
+    // Read videoUrl directly from the contract
+    const videoURL = await client.readContract({
+      address: nftAddress,
+      abi: streamMintNFTAbi,
+      functionName: 'videoUrl'
+    });
+    
+    // Read description directly from the contract
+    const description = await client.readContract({
+      address: nftAddress,
+      abi: streamMintNFTAbi,
+      functionName: 'description'
+    });
+    
+    if (!videoURL) {
+      throw new Error("No video URL found in StreamMintNFT contract");
+    }
+    
+    logger.info("Successfully read StreamMintNFT metadata", { 
+      videoURL,
+      description: description?.substring(0, 100) + "...",
+      maxSupply: maxSupply.toString(),
+    });
+    
+    return {
+      videoURL,
+      maxSupply: Number(maxSupply),
+    };
+  } catch (error) {
+    logger.error("Failed to read StreamMintNFT metadata", { nftAddress, error: error.message });
+    throw error;
+  }
 }
 
 // Select the smallest resolution video stream
@@ -143,6 +242,70 @@ async function uploadToIPFS(filePath, fileName) {
   }
 }
 
+// Upload JSON data to IPFS using Pinata HTTP API
+async function uploadJSONToIPFS(jsonData, fileName) {
+  try {
+    logger.info("Uploading JSON to IPFS via Pinata API", { fileName });
+    
+    // Convert JSON to buffer
+    const jsonString = JSON.stringify(jsonData, null, 2);
+    const jsonBuffer = Buffer.from(jsonString, 'utf8');
+    
+    // Create FormData for multipart upload
+    const formData = new FormData();
+    const blob = new Blob([jsonBuffer], { type: 'application/json' });
+    formData.append('file', blob, fileName);
+    formData.append('network', 'public');
+    
+    // Optional: Add metadata
+    const metadata = JSON.stringify({
+      name: fileName,
+      keyvalues: {
+        contentType: 'application/json',
+        uploadedAt: new Date().toISOString()
+      }
+    });
+    formData.append('pinataMetadata', metadata);
+    
+    // Make the API request
+    const response = await fetch('https://uploads.pinata.cloud/v3/files', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${PINATA_JWT}`
+      },
+      body: formData
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Pinata API request failed: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+    
+    const result = await response.json();
+    logger.info("JSON uploaded to IPFS successfully", { 
+      fileName,
+      cid: result.data.cid,
+      size: result.data.size,
+      id: result.data.id
+    });
+    
+    return {
+      ipfsHash: result.data.cid,
+      pinataId: result.data.id,
+      pinSize: result.data.size,
+      timestamp: result.data.created_at,
+      mimeType: result.data.mime_type,
+      isDuplicate: result.data.is_duplicate || false
+    };
+  } catch (error) {
+    logger.error("Failed to upload JSON to IPFS", { 
+      fileName, 
+      error: error.message 
+    });
+    throw error;
+  }
+}
+
 // Calculate score for a chunk based on overlapping periods
 function calculateChunkScore(chunkStart, chunkEnd, periods) {
   if (!periods || periods.length === 0) {
@@ -193,20 +356,93 @@ async function getVideoDetailsFromCustomAPI(link) {
   return data;
 }
 
+// Set token URI for NFT using contract function
+async function setTokenURI(nftAddress, tokenId, tokenURI) {
+  try {
+    logger.info("Setting token URI for NFT", { nftAddress, tokenId, tokenURI });
+    
+    // Execute the transaction using wallet client
+    const hash = await walletClient.writeContract({
+      address: nftAddress,
+      abi: streamMintNFTAbi,
+      functionName: 'setTokenUri',
+      args: [tokenId, tokenURI],
+      // Increase gas parameters for better reliability
+      gas: 1000000n, // Increased gas limit
+      maxFeePerGas: 2000000000n, // 2 Gwei
+      maxPriorityFeePerGas: 1500000000n, // 1.5 Gwei
+    });
+    
+    logger.info("Token URI transaction submitted", { 
+      tokenId, 
+      tokenURI,
+      transactionHash: hash
+    });
+    
+    // Wait for transaction confirmation
+    const receipt = await client.waitForTransactionReceipt({ 
+      hash,
+      timeout: 60000 // 60 seconds timeout
+    });
+    
+    logger.info("Token URI transaction confirmed", { 
+      tokenId, 
+      tokenURI,
+      transactionHash: hash,
+      blockNumber: receipt.blockNumber,
+      gasUsed: receipt.gasUsed.toString(),
+      status: receipt.status
+    });
+    
+    if (receipt.status !== 'success') {
+      throw new Error(`Transaction failed with status: ${receipt.status}`);
+    }
+    
+    return {
+      transactionHash: hash,
+      blockNumber: receipt.blockNumber,
+      gasUsed: receipt.gasUsed.toString(),
+      status: receipt.status
+    };
+  } catch (error) {
+    // Enhanced error logging
+    logger.error("Failed to set token URI", { 
+      tokenId, 
+      tokenURI, 
+      error: error.message,
+      stack: error.stack,
+      code: error.code,
+      details: error.details || error.data || error.reason
+    });
+    
+    // Add retry logic for specific errors
+    if (error.message.includes('insufficient funds') || error.message.includes('gas required exceeds allowance')) {
+      throw new Error(`Transaction failed due to gas issues: ${error.message}`);
+    }
+    
+    throw error;
+  }
+}
+
 export const extractTask = schemaTask({
   id: "extract-task",
   schema: z.object({
-    link: z.string().url(),
-    chunks: z.number().int().min(1),
-    threshold: z.number(),
+    nftAddress: z.string(),
   }),
   run: async (payload, { ctx }) => {
-    const { link, chunks, threshold } = payload;
+    const { nftAddress } = payload;
     const tempDir = path.join(__dirname, "temp", ctx.run.id);
     const videoPath = path.join(tempDir, "video.mp4");
     logger.info("Starting video extraction task", { payload });
+    
+    // Read NFT metadata from blockchain
+    const nftData = await readNFTMetadata(nftAddress);
+    const { videoURL: link, maxSupply: chunks } = nftData;
+    
+    logger.info("Using NFT metadata for extraction", { link, chunks });
+    
     // Make HTTP GET request to n8n endpoint to get periods with scores
-    const periods = await fetchPeriods(link, threshold);
+    const periods = await fetchPeriods(link, SCORE_THRESHOLD);
     logger.info("Received periods from n8n API", periods);
     await fs.ensureDir(tempDir);
     logger.info("Temporary directory created", { tempDir });
@@ -223,59 +459,131 @@ export const extractTask = schemaTask({
     const totalDuration = videoDetails.lengthSeconds;
     const chunkDuration = totalDuration / chunks;
     const items = [];
-    logger.info("Starting GIF conversion...", { chunks, chunkDuration });
+    logger.info("Starting GIF conversion and token metadata processing...", { chunks, chunkDuration });
+    
     for (let i = 0; i < chunks; i++) {
       const startTime = i * chunkDuration;
       const endTime = startTime + chunkDuration;
       const outputGifPath = path.join(tempDir, `chunk-${i}.gif`);
       logger.info(`Processing chunk ${i + 1}/${chunks}`, { startTime, duration: chunkDuration });
-      const ffmpegArgs = [
-        "-i", videoPath,
-        "-ss", startTime.toFixed(3),
-        "-t", chunkDuration.toFixed(3),
-        "-vf", "fps=5,scale=320:-1:flags=fast_bilinear",
-        "-y",
-        outputGifPath,
-      ];
-      await new Promise((resolve, reject) => {
-        const process = child_process.spawn('ffmpeg', ffmpegArgs);
-        process.on("close", (code) => {
-          if (code === 0) {
-            logger.info(`Chunk ${i + 1} converted to GIF successfully`, { outputGifPath });
-            resolve();
-          } else {
-            logger.error(`ffmpeg exited with code ${code} for chunk ${i + 1}`);
-            reject(new Error(`ffmpeg exited with code ${code}`));
-          }
-        });
-        process.on("error", (err) => {
-          logger.error(`Failed to start ffmpeg for chunk ${i + 1}`, { err });
-          reject(err);
-        });
-      });
-      // Upload the GIF to IPFS
+      
       try {
+        // Convert chunk to GIF
+        const ffmpegArgs = [
+          "-i", videoPath,
+          "-ss", startTime.toFixed(3),
+          "-t", chunkDuration.toFixed(3),
+          "-vf", "fps=5,scale=320:-1:flags=fast_bilinear",
+          "-y",
+          outputGifPath,
+        ];
+        
+        await new Promise((resolve, reject) => {
+          const process = child_process.spawn('ffmpeg', ffmpegArgs);
+          process.on("close", (code) => {
+            if (code === 0) {
+              logger.info(`Chunk ${i + 1} converted to GIF successfully`, { outputGifPath });
+              resolve();
+            } else {
+              logger.error(`ffmpeg exited with code ${code} for chunk ${i + 1}`);
+              reject(new Error(`ffmpeg exited with code ${code}`));
+            }
+          });
+          process.on("error", (err) => {
+            logger.error(`Failed to start ffmpeg for chunk ${i + 1}`, { err });
+            reject(err);
+          });
+        });
+
+        // Upload GIF to IPFS
         const fileName = `chunk-${i}.gif`;
         const ipfsResult = await uploadToIPFS(outputGifPath, fileName);
         logger.info(`Chunk ${i + 1} uploaded to IPFS`, ipfsResult);
+
         // Calculate score for this chunk based on period overlaps
         const chunkScore = calculateChunkScore(startTime, endTime, periods);
+        
+        // Create metadata object for this token
+        const metadata = {
+          name: `StreamMint Token #${i}`,
+          description: "A time-based segment from a StreamMint video with quality score",
+          image: `ipfs://${ipfsResult.ipfsHash}`,
+          animation_url: `ipfs://${ipfsResult.ipfsHash}`,
+          attributes: [
+            {
+              trait_type: "Start Time",
+              value: startTime.toFixed(3),
+              display_type: "number"
+            },
+            {
+              trait_type: "End Time", 
+              value: endTime.toFixed(3),
+              display_type: "number"
+            },
+            {
+              trait_type: "Duration",
+              value: chunkDuration.toFixed(3),
+              display_type: "number"
+            },
+            {
+              trait_type: "Quality Score",
+              value: chunkScore.toFixed(6),
+              display_type: "number"
+            }
+          ],
+          external_url: link,
+          background_color: "000000"
+        };
+        
+        // Upload metadata JSON to IPFS
+        const jsonFileName = `token-${i}-metadata.json`;
+        const jsonUploadResult = await uploadJSONToIPFS(metadata, jsonFileName);
+        const tokenURI = `ipfs://${jsonUploadResult.ipfsHash}`;
+        
+        logger.info(`Token ${i} metadata uploaded to IPFS`, { 
+          tokenId: i, 
+          metadataHash: jsonUploadResult.ipfsHash,
+          tokenURI 
+        });
+        
+        // Set token URI on the contract
+        const txData = await setTokenURI(nftAddress, i, tokenURI);
+        
+        // Add to items array
         items.push({
-          hash: ipfsResult.ipfsHash,
+          gifHash: ipfsResult.ipfsHash,
           start: startTime,
           end: endTime,
-          score: chunkScore
+          score: chunkScore,
+          metadataHash: jsonUploadResult.ipfsHash,
+          txHash: txData.transactionHash
         });
-      } catch (uploadError) {
-        logger.error(`Failed to upload chunk ${i + 1} to IPFS`, { 
-          error: uploadError.message 
+        
+        logger.info(`Chunk ${i + 1} fully processed`, { 
+          tokenId: i,
+          gifHash: ipfsResult.ipfsHash,
+          metadataHash: jsonUploadResult.ipfsHash,
+          tokenURI
         });
-        // Continue processing other chunks even if one upload fails
+        
+      } catch (error) {
+        logger.error(`Failed to process chunk ${i + 1}`, { 
+          error: error.message,
+          stack: error.stack
+        });
+        // Continue processing other chunks even if one fails
       }
     }
-    logger.info("All chunks converted to GIF successfully", { 
-      ipfsUploadsCount: items.length 
+    
+    logger.info("All chunks processed successfully", { 
+      processedChunks: items.length,
+      totalChunks: chunks
     });
-    return { items };
+
+    return { 
+      items,
+      videoURL: link,
+      maxSupply: chunks
+    };
   },
 });
