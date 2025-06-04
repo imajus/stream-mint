@@ -5,6 +5,7 @@
 
 import '@tamagui/polyfill-dev';
 import '@xsolla-zk/react/reset.css';
+import '@rainbow-me/rainbowkit/styles.css';
 import 'public/tamagui.css';
 import '~/config/components.config';
 
@@ -14,9 +15,10 @@ import { useServerInsertedHTML } from 'next/navigation';
 import { StyleSheet } from 'react-native';
 import type { ColorScheme } from '@tamagui/next-theme';
 import type { ReactNode } from 'react';
+import { Web3Provider } from './web3-provider';
 import { CustomSnackBar } from '~/components/snack-bar/snack-bar';
-import { config } from '~/config/tamagui.config';
 import { CustomToast } from '~/components/toast/toast';
+import { config } from '~/config/tamagui.config';
 
 export function NextTamaguiProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useRootTheme();
@@ -42,22 +44,24 @@ export function NextTamaguiProvider({ children }: { children: ReactNode }) {
   });
 
   return (
-    <NextThemeProvider
-      skipNextHead
-      defaultTheme="dark"
-      onChangeTheme={(next) => {
-        setTheme(next as ColorScheme);
-      }}
-    >
-      <TamaguiProvider config={config} defaultTheme={'dark'}>
-        <NotificationProvider swipeDirection="vertical">
-          {children}
-          <CustomToast />
-          <CustomSnackBar />
-          <NotificationViewport name="toast" top={20} left={0} right={0} />
-          <NotificationViewport name="snack-bar" multipleNotifications bottom={0} right={0} />
-        </NotificationProvider>
-      </TamaguiProvider>
-    </NextThemeProvider>
+    <Web3Provider>
+      <NextThemeProvider
+        skipNextHead
+        defaultTheme="dark"
+        onChangeTheme={(next) => {
+          setTheme(next as ColorScheme);
+        }}
+      >
+        <TamaguiProvider config={config} defaultTheme={'dark'}>
+          <NotificationProvider swipeDirection="vertical">
+            {children}
+            <CustomToast />
+            <CustomSnackBar />
+            <NotificationViewport name="toast" top={20} left={0} right={0} />
+            <NotificationViewport name="snack-bar" multipleNotifications bottom={0} right={0} />
+          </NotificationProvider>
+        </TamaguiProvider>
+      </NextThemeProvider>
+    </Web3Provider>
   );
 }

@@ -1,70 +1,79 @@
 'use client';
 
-import { Grid2x2 } from '@xsolla-zk/icons';
-import { getSafeTokenValue, RichIcon, SemanticText, Stack } from '@xsolla-zk/react';
+import { useRouter } from 'next/navigation';
 import { memo } from 'react';
 import { Path, Svg } from 'react-native-svg';
+import { Grid2x2 } from '@xsolla-zk/icons';
+import { getSafeTokenValue, RichIcon, SemanticText, Stack, Input, Button } from '@xsolla-zk/react';
 import type { IconProp, RichIconSizes } from '@xsolla-zk/react';
 import { Card } from '~/components/card/card';
 import { ContentStack } from '~/components/stacks/content-stack';
-import { useRouter } from 'next/navigation';
 
 const Logo1 = memo(LogoXSollaZK) as IconProp;
 
 export default function HomeScreen() {
-  const { push } = useRouter();
+  const router = useRouter();
 
   return (
     <>
-      <Stack
-        borderRadius="$radius.550"
-        borderColor="$border.neutral-tertiary"
-        gap="$space.350"
-        borderWidth="$stroke.100"
-        paddingVertical="$space.400"
-        backgroundColor="$layer.floor-1"
-      >
-        <Stack position="relative" width={160} marginHorizontal="auto">
-          <RichIcon
-            size="$800"
-            shape="squircle"
-            rotate="5deg"
-            backgroundColor="$background.brand-high"
-          >
-            <RichIcon.Icon icon={Grid2x2} color="$content.on-brand" />
-          </RichIcon>
-          <RichIcon
-            size="$800"
-            shape="squircle"
-            rotate="-5deg"
-            backgroundColor="$background.brand-extra-high"
-            position="absolute"
-          >
-            <RichIcon.Icon icon={Logo1} />
-          </RichIcon>
+      <Stack gap="$space.400">
+        <Stack
+          borderRadius="$radius.550"
+          borderColor="$border.neutral-tertiary"
+          gap="$space.350"
+          borderWidth="$stroke.100"
+          paddingVertical="$space.400"
+          backgroundColor="$layer.floor-1"
+        >
+          <Stack position="relative" width={160} marginHorizontal="auto">
+            <RichIcon
+              size="$800"
+              shape="squircle"
+              rotate="5deg"
+              backgroundColor="$background.brand-high"
+            >
+              <RichIcon.Icon icon={Grid2x2} color="$content.on-brand" />
+            </RichIcon>
+            <RichIcon
+              size="$800"
+              shape="squircle"
+              rotate="-5deg"
+              backgroundColor="$background.brand-extra-high"
+              position="absolute"
+            >
+              <RichIcon.Icon icon={Logo1} />
+            </RichIcon>
+          </Stack>
+          <ContentStack>
+            <SemanticText variant="headerS" textAlign="center">
+              Stream Mint
+            </SemanticText>
+            <SemanticText variant="paragraphS" textAlign="center" color="$content.neutral-secondary">
+              Stream Mint provides a simple no-code interface for creators to create and distribute NFT packs tied to portions of YouTube live stream. Each pack consists of a configurable number of NFTs, where: every NFT corresponds to a unique, equal-length segment of the future video; after the stream concludes, each segment is rendered and attached to its NFT; a "replay score" derived from YouTube's most-replayed statistics is fetched via a trustless oracle and assigned to each token. Higher scores reflect the most-viewed or most-replayed moments, driving scarcity and value in secondary markets.
+            </SemanticText>
+          </ContentStack>
         </Stack>
-        <ContentStack>
-          <SemanticText variant="headerS" textAlign="center">
-            Explore the Xsolla ZK UI Kit
+        <Stack
+          borderRadius="$radius.550"
+          borderColor="$border.neutral-tertiary"
+          borderWidth="$stroke.100"
+          padding="$space.400"
+          backgroundColor="$layer.floor-1"
+          gap="$space.300"
+        >
+          <SemanticText variant="headerS">
+            Create Stream NFT Collection
           </SemanticText>
-          <SemanticText variant="paragraphS" textAlign="center" color="$content.neutral-secondary">
-            Discover ready-made components, responsive layouts, and themes in action — quickly
-            customize and integrate them into your project
-          </SemanticText>
-        </ContentStack>
-      </Stack>
-      {/* <Input placeholder="Search" size="$500">
-        <Input.StartSlot>
-          <RichIcon size="$200" shape="squircle">
-            <RichIcon.Icon icon={Search} />
-          </RichIcon>
-        </Input.StartSlot>
-      </Input> */}
-      <Stack gap="$space.100">
-        <Card onPress={() => push('/colors')}>Colors</Card>
-        <Card onPress={() => push('/typography')}>Typography</Card>
-        <Card onPress={() => push('/modals-overlays')}>Modals & Overlays</Card>
-        <Card onPress={() => push('/size')}>Size</Card>
+          <Stack gap="$space.250">
+            <Input placeholder="Collection Name" size="$500" />
+            <Input placeholder="Description" size="$500" />
+            <Input placeholder="YouTube Live Stream URL" size="$500" />
+            <Input placeholder="Number of NFTs" size="$500" keyboardType="numeric" />
+          </Stack>
+          <Button>
+            <Button.Text>Create Collection</Button.Text>
+          </Button>
+        </Stack>
       </Stack>
     </>
   );

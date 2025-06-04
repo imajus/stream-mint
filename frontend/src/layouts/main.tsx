@@ -1,5 +1,6 @@
 'use client';
 
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { ArrowLeft } from '@xsolla-zk/icons';
 import { NavBar, RichIcon, View } from '@xsolla-zk/react';
 import dynamic from 'next/dynamic';
@@ -15,31 +16,31 @@ const pageMappings: Record<string, string> = {
   '/size': 'Size',
 };
 
-const DynamicToggleThemeButton = dynamic(() => import('~/interface/toggle-theme-button').then((mod) => mod.ToggleThemeButton), {
-  ssr: false,
-});
+const DynamicToggleThemeButton = dynamic(
+  () => import('~/interface/toggle-theme-button').then((mod) => mod.ToggleThemeButton),
+  {
+    ssr: false,
+  },
+);
 
 export function MainLayout({ children }: { children: ReactNode }) {
-  const { back, replace } = useRouter();
+  const router = useRouter();
   const pathname = usePathname();
-
   const notHomePage = pathname !== '/';
-
   return (
-    <View maxWidth={800} width="100%" marginHorizontal="auto">
-      {/* <SafeAreaView edges={['top']}> */}
+    <>
       <NavBar preset="prominent" backgroundColor="$layer.floor-1">
         {/* {isWeb && <Stack paddingTop={16} />} */}
         <NavBar.StartSlot>
-          {(notHomePage) && (
+          {notHomePage && (
             <RichIcon
               size="$300"
               pressable
               onPress={() => {
                 if (notHomePage) {
-                  replace('/');
+                  router.replace('/');
                 } else {
-                  back();
+                  router.back();
                 }
               }}
             >
@@ -51,11 +52,13 @@ export function MainLayout({ children }: { children: ReactNode }) {
           <NavBar.Title>{pageMappings[pathname]}</NavBar.Title>
         </NavBar.Center>
         <NavBar.EndSlot>
+          <ConnectButton />
           <DynamicToggleThemeButton />
         </NavBar.EndSlot>
       </NavBar>
-      {/* </SafeAreaView> */}
-      <ScreenStack>{children}</ScreenStack>
-    </View>
+      <View maxWidth={800} width="100%" marginHorizontal="auto">
+        <ScreenStack>{children}</ScreenStack>
+      </View>
+    </>
   );
 }

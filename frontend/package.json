@@ -9,12 +9,14 @@
     "start": "next start",
     "export": "next build && next export",
     "generate:icons": "xzkui-icons generate -i ./raw-icons -o ./src/icons",
-    "generate:tokens": "xzkui-tokens generate -t tamagui -i ./raw-tokens -o ./src/tamagui/tokens -p"
+    "generate:tokens": "xzkui-tokens generate -t tamagui -i ./raw-tokens -o ./src/config/tokens -p"
   },
   "dependencies": {
+    "@rainbow-me/rainbowkit": "^2.2.5",
     "@tamagui/image-next": "catalog:tamagui",
     "@tamagui/next-theme": "catalog:tamagui",
     "@tamagui/polyfill-dev": "catalog:tamagui",
+    "@tanstack/react-query": "^5.80.3",
     "@xsolla-zk/config": "latest",
     "@xsolla-zk/icons": "latest",
     "@xsolla-zk/react": "latest",
@@ -22,7 +24,9 @@
     "react": "*",
     "react-dom": "*",
     "react-native": "*",
-    "react-native-web": "^0.20.0"
+    "react-native-web": "^0.20.0",
+    "viem": "^2.30.6",
+    "wagmi": "^2.15.5"
   },
   "devDependencies": {
     "@eslint/js": "catalog:eslint9",
@@ -30,9 +34,10 @@
     "@types/node": "catalog:",
     "@types/react": "*",
     "@types/react-dom": "*",
-    "eslint-config-next": "catalog:next15",
     "@xsolla-zk/icons-generator": "latest",
+    "@xsolla-zk/tokens": "latest",
     "eslint": "catalog:eslint9",
+    "eslint-config-next": "catalog:next15",
     "eslint-config-prettier": "10.1.5",
     "eslint-import-resolver-typescript": "4.3.4",
     "eslint-plugin-import": "2.31.0",
@@ -41,6 +46,7 @@
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "catalog:",
     "react-native": "*",
+    "svgo": "^3.0.0",
     "typescript": "catalog:",
     "typescript-eslint": "catalog:typescript-eslint"
   },
