@@ -8,6 +8,7 @@ export default defineConfig({
   maxDuration: 3600,
   dirs: ["./src/trigger"],
   build: {
+    external: ["node-libcurl"],
     extensions: [ffmpeg()],
   },
 });

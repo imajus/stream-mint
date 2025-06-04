@@ -5,57 +5,19 @@ import fs from "fs-extra";
 import path from "path";
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { promisify } from "util";
+import { Curl } from 'node-libcurl';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Environment variables for RapidAPI
-const RAPIDAPI_HOST = process.env.RAPIDAPI_HOST || 'youtube-media-downloader.p.rapidapi.com';
-const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
-
 // Environment variables for Pinata
 const PINATA_JWT = process.env.PINATA_JWT;
 
-if (!RAPIDAPI_KEY) {
-  throw new Error('RAPIDAPI_KEY environment variable is required');
-}
+const CURL_TIMEOUT = process.env.CURL_TIMEOUT ?? 3 * 60 * 60;
+
 if (!PINATA_JWT) {
   throw new Error('PINATA_JWT environment variable is required');
-}
-
-// Extract video ID from YouTube URL
-function extractVideoId(url) {
-  const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
-    /^([a-zA-Z0-9_-]{11})$/
-  ];
-  for (const pattern of patterns) {
-    const match = url.match(pattern);
-    if (match) {
-      return match[1];
-    }
-  }
-  throw new Error('Invalid YouTube URL or video ID');
-}
-
-// Get video details from RapidAPI
-async function getVideoDetails(videoId) {
-  const url = `https://${RAPIDAPI_HOST}/v2/video/details?videoId=${videoId}&urlAccess=normal&videos=auto&audios=auto`;
-  const options = {
-    method: 'GET',
-    headers: {
-      'x-rapidapi-host': RAPIDAPI_HOST,
-      'x-rapidapi-key': RAPIDAPI_KEY
-    }
-  };
-  logger.info("Making API request to get video details", { videoId, url });
-  const response = await fetch(url, options);
-  if (!response.ok) {
-    throw new Error(`RapidAPI request failed: ${response.status} ${response.statusText}`);
-  }
-  const data = await response.json();
-  logger.info("Received video details from API", { videoId, hasVideos: !!data.videos });
-  return data;
 }
 
 // Select the smallest resolution video stream
@@ -75,17 +37,48 @@ function selectSmallestVideoStream(videoStreams) {
 }
 
 // Download video from URL
-async function downloadVideo(videoUrl, outputPath) {
-  logger.info("Downloading video from URL", { videoUrl, outputPath });
-  const response = await fetch(videoUrl);
-  if (!response.ok) {
-    throw new Error(`Failed to download video: ${response.status} ${response.statusText}`);
+const downloadVideo = promisify((url, outputPath, callback) => {
+  const curl = new Curl();
+  const writeStream = fs.createWriteStream(outputPath);
+  // Set basic options
+  curl.setOpt('URL', url);
+  curl.setOpt('FOLLOWLOCATION', true); // Follow redirects (equivalent to curl -L)
+  curl.setOpt('TIMEOUT', Math.floor(CURL_TIMEOUT)); // Convert ms to seconds
+  curl.setOpt('WRITEFUNCTION', (buffer, size, nmemb) => {
+    const length = size * nmemb;
+    writeStream.write(buffer.subarray(0, length));
+    return length;
+  });
+  // Automatically configure proxy from environment variables
+  if (process.env.CURL_PROXY) {
+    const proxyUrl = process.env.CURL_PROXY;
+    curl.setOpt('PROXY', proxyUrl);
+    // Handle proxy authentication if included in URL
+    const proxyMatch = proxyUrl.match(/^https?:\/\/([^:]+):([^@]+)@/);
+    if (proxyMatch) {
+      curl.setOpt('PROXYUSERPWD', `${proxyMatch[1]}:${proxyMatch[2]}`);
+    }
   }
-  const arrayBuffer = await response.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
-  await fs.writeFile(outputPath, buffer);
-  logger.info("Video downloaded successfully", { outputPath, size: buffer.length });
-}
+  curl.on('end', (statusCode, data, headers) => {
+    writeStream.end();
+    if (statusCode >= 200 && statusCode < 300) {
+      callback(null);
+    } else {
+      // Clean up the file on error
+      fs.unlink(outputPath, () => {});
+      callback(new Error(`HTTP error! status: ${statusCode}`));
+    }
+    curl.close();
+  });
+  curl.on('error', (error) => {
+    writeStream.end();
+    // Clean up the file on error
+    fs.unlink(outputPath, () => {});
+    callback(new Error(`Download failed: ${error.message}`));
+    curl.close();
+  });
+  curl.perform();
+});
 
 // Upload file to IPFS using Pinata HTTP API
 async function uploadToIPFS(filePath, fileName) {
@@ -187,6 +180,19 @@ async function fetchPeriods(link, threshold) {
   }
 }
 
+// Add new function to get video details from custom API
+async function getVideoDetailsFromCustomAPI(link) {
+  const url = `https://n8n.majus.org/webhook/25520864-4869-4762-b0e1-6a1c90b0b0c6?link=${encodeURIComponent(link)}`;
+  logger.info("Making API request to get video details", { link, url });
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Custom API request failed: ${response.status} ${response.statusText}`);
+  }
+  const data = await response.json();
+  logger.info("Received video details from custom API", { link, hasVideos: !!data.videos });
+  return data;
+}
+
 export const extractTask = schemaTask({
   id: "extract-task",
   schema: z.object({
@@ -199,44 +205,30 @@ export const extractTask = schemaTask({
     const tempDir = path.join(__dirname, "temp", ctx.run.id);
     const videoPath = path.join(tempDir, "video.mp4");
     logger.info("Starting video extraction task", { payload });
-
     // Make HTTP GET request to n8n endpoint to get periods with scores
     const periods = await fetchPeriods(link, threshold);
     logger.info("Received periods from n8n API", periods);
-
     await fs.ensureDir(tempDir);
     logger.info("Temporary directory created", { tempDir });
-
-    // Extract video ID from YouTube URL
-    const videoId = extractVideoId(link);
-    logger.info("Extracted video ID", { videoId });
-
-    // Get video details from RapidAPI
-    const videoDetails = await getVideoDetails(videoId);
+    // Get video details from custom API
+    const videoDetails = await getVideoDetailsFromCustomAPI(link);
     if (videoDetails.lengthSeconds > 1800) {
       throw new Error("Video is longer than 30 minutes. Please provide a shorter video.");
     }
-    
     // Select the smallest resolution video stream
     const selectedStream = selectSmallestVideoStream(videoDetails.videos);
-    
     // Download the video
     await downloadVideo(selectedStream.url, videoPath);
-
     // Get video duration from the API response
     const totalDuration = videoDetails.lengthSeconds;
     const chunkDuration = totalDuration / chunks;
     const items = [];
-
     logger.info("Starting GIF conversion...", { chunks, chunkDuration });
-
     for (let i = 0; i < chunks; i++) {
       const startTime = i * chunkDuration;
       const endTime = startTime + chunkDuration;
       const outputGifPath = path.join(tempDir, `chunk-${i}.gif`);
-      
       logger.info(`Processing chunk ${i + 1}/${chunks}`, { startTime, duration: chunkDuration });
-
       const ffmpegArgs = [
         "-i", videoPath,
         "-ss", startTime.toFixed(3),
@@ -245,11 +237,8 @@ export const extractTask = schemaTask({
         "-y",
         outputGifPath,
       ];
-
       await new Promise((resolve, reject) => {
         const process = child_process.spawn('ffmpeg', ffmpegArgs);
-        // process.stdout.on("data", (data) => logger.debug(`ffmpeg stdout: ${data}`));
-        // process.stderr.on("data", (data) => logger.info(`ffmpeg stderr: ${data}`));
         process.on("close", (code) => {
           if (code === 0) {
             logger.info(`Chunk ${i + 1} converted to GIF successfully`, { outputGifPath });
@@ -264,7 +253,6 @@ export const extractTask = schemaTask({
           reject(err);
         });
       });
-
       // Upload the GIF to IPFS
       try {
         const fileName = `chunk-${i}.gif`;
@@ -285,11 +273,9 @@ export const extractTask = schemaTask({
         // Continue processing other chunks even if one upload fails
       }
     }
-
     logger.info("All chunks converted to GIF successfully", { 
       ipfsUploadsCount: items.length 
     });
-    
     return { items };
   },
 });
