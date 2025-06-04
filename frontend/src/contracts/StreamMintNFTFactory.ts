@@ -5,7 +5,7 @@ import type { ContractArtifact } from './types';
 const artifact = StreamMintNFTFactoryArtifact as ContractArtifact;
 
 export const STREAM_MINT_NFT_FACTORY_ADDRESS =
-  '0x05c7fc39dE355275F2b29ef4ca41CaB421514477' as const; // Replace with your deployed contract address
+  '0x77E17D9Ba79079B6377A1F5b69c3b5611c5D0939' as const; // Replace with your deployed contract address
 
 export const streamMintNFTFactoryConfig = {
   address: STREAM_MINT_NFT_FACTORY_ADDRESS,
