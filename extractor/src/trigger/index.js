@@ -126,7 +126,7 @@ function selectSmallestVideoStream(videoStreams) {
   }
   // Sort by quality (height) ascending to get the smallest
   const sortedStreams = videoStreams.items
-    .filter(stream => stream.extension === 'mp4')
+    .filter(stream => stream.extension === 'webm')
     .sort((a, b) => a.size - b.size);
   if (sortedStreams.length === 0) {
     throw new Error('No valid video streams found');
@@ -187,9 +187,34 @@ async function uploadToIPFS(filePath, fileName) {
     // Read the file buffer
     const fileBuffer = await fs.readFile(filePath);
     
+    // Detect MIME type based on file extension
+    let mimeType = 'application/octet-stream'; // default
+    const extension = path.extname(fileName).toLowerCase();
+    switch (extension) {
+      case '.jpg':
+      case '.jpeg':
+        mimeType = 'image/jpeg';
+        break;
+      case '.png':
+        mimeType = 'image/png';
+        break;
+      case '.gif':
+        mimeType = 'image/gif';
+        break;
+      case '.webm':
+        mimeType = 'video/webm';
+        break;
+      case '.mp4':
+        mimeType = 'video/mp4';
+        break;
+      case '.mov':
+        mimeType = 'video/quicktime';
+        break;
+    }
+    
     // Create FormData for multipart upload
     const formData = new FormData();
-    const blob = new Blob([fileBuffer], { type: 'image/gif' });
+    const blob = new Blob([fileBuffer], { type: mimeType });
     formData.append('file', blob, fileName);
     formData.append('network', 'public');
     
@@ -198,7 +223,8 @@ async function uploadToIPFS(filePath, fileName) {
       name: fileName,
       keyvalues: {
         originalPath: filePath,
-        uploadedAt: new Date().toISOString()
+        uploadedAt: new Date().toISOString(),
+        mimeType: mimeType
       }
     });
     formData.append('pinataMetadata', metadata);
@@ -222,7 +248,8 @@ async function uploadToIPFS(filePath, fileName) {
       fileName,
       cid: result.data.cid,
       size: result.data.size,
-      id: result.data.id
+      id: result.data.id,
+      mimeType: mimeType
     });
     
     return {
@@ -382,7 +409,7 @@ async function setTokenURI(nftAddress, tokenId, tokenURI) {
     // Wait for transaction confirmation
     const receipt = await client.waitForTransactionReceipt({ 
       hash,
-      timeout: 60000 // 60 seconds timeout
+      timeout: 120000,
     });
     
     logger.info("Token URI transaction confirmed", { 
@@ -459,12 +486,14 @@ export const extractTask = schemaTask({
     const totalDuration = videoDetails.lengthSeconds;
     const chunkDuration = totalDuration / chunks;
     const items = [];
+    const pendingTransactions = [];
     logger.info("Starting JPEG extraction and token metadata processing...", { chunks, chunkDuration });
     
     for (let i = 0; i < chunks; i++) {
       const startTime = i * chunkDuration;
       const endTime = startTime + chunkDuration;
       const outputImagePath = path.join(tempDir, `chunk-${i}.jpg`);
+      const outputVideoPath = path.join(tempDir, `chunk-${i}.webm`);
       logger.info(`Processing chunk ${i + 1}/${chunks}`, { startTime, duration: chunkDuration });
       
       try {
@@ -473,7 +502,6 @@ export const extractTask = schemaTask({
           "-i", videoPath,
           "-ss", startTime.toFixed(3),
           "-vframes", "1",
-          "-vf", "scale=480:-1:flags=lanczos",
           "-q:v", "2",
           "-y",
           outputImagePath,
@@ -483,23 +511,60 @@ export const extractTask = schemaTask({
           const process = child_process.spawn('ffmpeg', ffmpegArgs);
           process.on("close", (code) => {
             if (code === 0) {
-              logger.info(`Chunk ${i + 1} extracted successfully`, { outputImagePath });
+              logger.info(`Chunk ${i + 1} JPEG extracted successfully`, { outputImagePath });
               resolve();
             } else {
-              logger.error(`ffmpeg exited with code ${code} for chunk ${i + 1}`);
+              logger.error(`ffmpeg exited with code ${code} for chunk ${i + 1} JPEG extraction`);
               reject(new Error(`ffmpeg exited with code ${code}`));
             }
           });
           process.on("error", (err) => {
-            logger.error(`Failed to start ffmpeg for chunk ${i + 1}`, { err });
+            logger.error(`Failed to start ffmpeg for chunk ${i + 1} JPEG extraction`, { err });
+            reject(err);
+          });
+        });
+
+        // Extract WEBM video segment
+        const ffmpegArgsVideo = [
+          "-i", videoPath,
+          "-ss", startTime.toFixed(3),
+          "-t", chunkDuration.toFixed(3),
+          // "-c:v", "libvpx",
+          // "-crf", "40",
+          // "-b:v", "200k",
+          "-an",
+          "-cpu-used", "8",
+          "-deadline", "realtime",
+          "-y",
+          outputVideoPath,
+        ];
+        
+        await new Promise((resolve, reject) => {
+          const process = child_process.spawn('ffmpeg', ffmpegArgsVideo);
+          process.on("close", (code) => {
+            if (code === 0) {
+              logger.info(`Chunk ${i + 1} WEBM extracted successfully`, { outputVideoPath });
+              resolve();
+            } else {
+              logger.error(`ffmpeg exited with code ${code} for chunk ${i + 1} WEBM extraction`);
+              reject(new Error(`ffmpeg exited with code ${code}`));
+            }
+          });
+          process.on("error", (err) => {
+            logger.error(`Failed to start ffmpeg for chunk ${i + 1} WEBM extraction`, { err });
             reject(err);
           });
         });
 
         // Upload JPEG to IPFS
-        const fileName = `chunk-${i}.jpg`;
-        const ipfsResult = await uploadToIPFS(outputImagePath, fileName);
-        logger.info(`Chunk ${i + 1} uploaded to IPFS`, ipfsResult);
+        const imageFileName = `chunk-${i}.jpg`;
+        const imageIpfsResult = await uploadToIPFS(outputImagePath, imageFileName);
+        logger.info(`Chunk ${i + 1} JPEG uploaded to IPFS`, imageIpfsResult);
+
+        // Upload WEBM to IPFS
+        const videoFileName = `chunk-${i}.webm`;
+        const videoIpfsResult = await uploadToIPFS(outputVideoPath, videoFileName);
+        logger.info(`Chunk ${i + 1} WEBM uploaded to IPFS`, videoIpfsResult);
 
         // Calculate score for this chunk based on period overlaps
         const chunkScore = calculateChunkScore(startTime, endTime, periods);
@@ -508,8 +573,8 @@ export const extractTask = schemaTask({
         const metadata = {
           name: `StreamMint Token #${i}`,
           description: "A time-based segment from a StreamMint video with quality score",
-          image: `ipfs://${ipfsResult.ipfsHash}`,
-          animation_url: `ipfs://${ipfsResult.ipfsHash}`, 
+          image: `ipfs://${imageIpfsResult.ipfsHash}`,
+          animation_url: `ipfs://${videoIpfsResult.ipfsHash}`,
           attributes: [
             {
               trait_type: "Start Time",
@@ -547,22 +612,28 @@ export const extractTask = schemaTask({
           tokenURI 
         });
         
-        // Set token URI on the contract
-        const txData = await setTokenURI(nftAddress, i, tokenURI);
+        // Start blockchain transaction without awaiting
+        const txPromise = setTokenURI(nftAddress, i, tokenURI);
+        pendingTransactions.push({
+          tokenId: i,
+          promise: txPromise
+        });
         
-        // Add to items array
+        // Add to items array without transaction data for now
         items.push({
-          imageHash: ipfsResult.ipfsHash,
+          imageHash: imageIpfsResult.ipfsHash,
+          videoHash: videoIpfsResult.ipfsHash,
           start: startTime,
           end: endTime,
           score: chunkScore,
           metadataHash: jsonUploadResult.ipfsHash,
-          txHash: txData.transactionHash
+          tokenId: i
         });
         
-        logger.info(`Chunk ${i + 1} fully processed`, { 
+        logger.info(`Chunk ${i + 1} processing completed, blockchain transaction started`, { 
           tokenId: i,
-          imageHash: ipfsResult.ipfsHash,
+          imageHash: imageIpfsResult.ipfsHash,
+          videoHash: videoIpfsResult.ipfsHash,
           metadataHash: jsonUploadResult.ipfsHash,
           tokenURI
         });
@@ -576,9 +647,41 @@ export const extractTask = schemaTask({
       }
     }
     
-    logger.info("All chunks processed successfully", { 
+    logger.info("All chunks processed, waiting for blockchain transactions to complete", { 
       processedChunks: items.length,
-      totalChunks: chunks
+      totalChunks: chunks,
+      pendingTransactions: pendingTransactions.length
+    });
+
+    // Wait for all blockchain transactions to complete
+    const transactionResults = await Promise.allSettled(
+      pendingTransactions.map(tx => tx.promise)
+    );
+    
+    // Update items with transaction results
+    transactionResults.forEach((result, index) => {
+      const { tokenId } = pendingTransactions[index];
+      const itemIndex = items.findIndex(item => item.tokenId === tokenId);
+      
+      if (result.status === 'fulfilled') {
+        items[itemIndex].txHash = result.value.transactionHash;
+        logger.info(`Blockchain transaction completed for token ${tokenId}`, {
+          txHash: result.value.transactionHash,
+          blockNumber: result.value.blockNumber
+        });
+      } else {
+        logger.error(`Blockchain transaction failed for token ${tokenId}`, {
+          error: result.reason?.message || result.reason
+        });
+        items[itemIndex].txError = result.reason?.message || 'Transaction failed';
+      }
+    });
+
+    logger.info("All processing completed", { 
+      processedChunks: items.length,
+      totalChunks: chunks,
+      completedTransactions: transactionResults.filter(r => r.status === 'fulfilled').length,
+      failedTransactions: transactionResults.filter(r => r.status === 'rejected').length
     });
 
     return { 
