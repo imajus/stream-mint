@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { SemanticText, Stack, Button } from '@xsolla-zk/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useNFTContractMetadata, useMintNFT } from '~/contracts/hooks';
@@ -12,6 +13,23 @@ export default function CollectionPage() {
   const contractAddress = searchParams.get('address');
   const { metadata, isLoading } = useNFTContractMetadata(contractAddress || '');
   const { mintNFT, isPending, isConfirming, isSuccess, error, hash } = useMintNFT(contractAddress || '');
+
+  useEffect(() => {
+    fetch(`https://n8n.majus.org/webhook/127b5f8a-86bf-4928-9338-f060f561f292?address=${contractAddress}`, {
+      method: 'GET',
+      // headers: {
+      //   'Content-Type': 'application/json'
+      // },
+      // body: JSON.stringify({ address: contractAddress })
+    })
+      .then(response => response.json())
+      .then(data => {
+        console.log('Oracle response:', data);
+      })
+      .catch(error => {
+        console.error('Oracle error:', error);
+      });
+  }, []);
   
   if (!contractAddress) {
     return (

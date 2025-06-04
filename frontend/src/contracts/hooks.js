@@ -12,7 +12,7 @@ import { getStreamMintNFTConfig } from './StreamMintNFT';
 // Hook for creating a new NFT collection
 export function useCreateCollection() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+  const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({
     hash,
   });
   const createCollection = (args) => {
@@ -35,6 +35,7 @@ export function useCreateCollection() {
     isSuccess,
     error,
     hash,
+    receipt,
   };
 }
 
@@ -58,14 +59,12 @@ export function useNewCollectionEvents() {
   
   useEffect(() => {
     const fetchHistoricalEvents = async () => {
-      if (!publicClient) return;
-      
+      if (!publicClient) return;  
       setIsLoading(true);
       setError(null);
-      
       try {
         const logs = await publicClient.getLogs({
-          address: streamMintNFTFactoryConfig.address,
+          ...streamMintNFTFactoryConfig,
           event: {
             type: 'event',
             name: 'NewCollectionDeployed',
@@ -80,7 +79,6 @@ export function useNewCollectionEvents() {
           fromBlock: 3997145n,
           toBlock: 'latest',
         });
-        
         const formattedEvents = logs.map(log => ({
           address: log.address,
           blockNumber: log.blockNumber,
@@ -89,11 +87,10 @@ export function useNewCollectionEvents() {
             newCollectionAddress: log.args?.newCollectionAddress,
           },
         }));
-        
         setAllEvents(formattedEvents);
       } catch (err) {
         console.error('Error fetching historical events:', err);
-        setError(err instanceof Error ? err : new Error('Unknown error'));
+        setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
         setIsLoading(false);
       }
@@ -102,22 +99,28 @@ export function useNewCollectionEvents() {
     fetchHistoricalEvents();
   }, [publicClient]);
   
-  useWatchContractEvent({
-    ...streamMintNFTFactoryConfig,
-    fromBlock: 3997145n,
-    eventName: 'NewCollectionDeployed',
-    onLogs(logs) {
-      setAllEvents((prevEvents) => {
-        const newEvents = logs.filter((log) =>
-          !prevEvents.some(
-            (existingEvent) =>
-              existingEvent.transactionHash === log.transactionHash,
-          ),
-        );
-        return [...prevEvents, ...newEvents];
-      });
-    },
-  });
+  //FIXME: This is not working as expected
+  // useWatchContractEvent({
+  //   ...streamMintNFTFactoryConfig,
+  //   fromBlock: 3997145n,
+  //   eventName: 'NewCollectionDeployed',
+  //   pollingInterval: 1000,
+  //   onLogs(logs) {
+  //     setAllEvents((prevEvents) => {
+  //       const newEvents = logs.filter((log) =>
+  //         !prevEvents.some(
+  //           (existingEvent) =>
+  //             existingEvent.transactionHash === log.transactionHash,
+  //         ),
+  //       );
+  //       return [...prevEvents, ...newEvents];
+  //     });
+  //   },
+  //   onError(error) {
+  //     console.error('❌ Error in useWatchContractEvent:', error);
+  //     // setError(error instanceof Error ? error.message : 'Unknown error');
+  //   },
+  // });
   
   return {
     events: allEvents,
@@ -209,7 +212,7 @@ export function useNFTMetadata(contractAddress, tokenId) {
         setError(null);
         
         // Extract IPFS hash from the URI
-        const ipfsHash = tokenURI.replace('ipfs://', '');
+        const ipfsHash = String(tokenURI).replace('ipfs://', '');
         const response = await fetch(`https://majus.mypinata.cloud/ipfs/${ipfsHash}`);
         
         if (!response.ok) {

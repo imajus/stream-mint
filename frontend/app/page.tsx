@@ -3,7 +3,7 @@
 import { Grid2x2 } from '@xsolla-zk/icons';
 import { getSafeTokenValue, RichIcon, SemanticText, Stack, Input, Button } from '@xsolla-zk/react';
 import { useRouter } from 'next/navigation';
-import { memo, useState } from 'react';
+import { memo, useState, useEffect } from 'react';
 import { Path, Svg } from 'react-native-svg';
 import type { IconProp, RichIconSizes } from '@xsolla-zk/react';
 import { ContentStack } from '~/components/stacks/content-stack';
@@ -77,6 +77,7 @@ export default function HomeScreen() {
     events: collectionEvents,
     isLoading: eventsLoading,
     error: eventsError,
+    refetch: refetchEvents,
   } = useNewCollectionEvents();
   const [formData, setFormData] = useState({
     collectionName: '',
@@ -85,6 +86,8 @@ export default function HomeScreen() {
     youtubeUrl: '',
     numberOfNFTs: '',
   });
+
+  
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
