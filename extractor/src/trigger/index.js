@@ -473,7 +473,8 @@ export const extractTask = schemaTask({
           "-i", videoPath,
           "-ss", startTime.toFixed(3),
           "-vframes", "1",
-          "-vf", "scale=320:-1:flags=fast_bilinear",
+          "-vf", "scale=480:-1:flags=lanczos",
+          "-q:v", "2",
           "-y",
           outputImagePath,
         ];
