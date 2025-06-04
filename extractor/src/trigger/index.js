@@ -459,30 +459,30 @@ export const extractTask = schemaTask({
     const totalDuration = videoDetails.lengthSeconds;
     const chunkDuration = totalDuration / chunks;
     const items = [];
-    logger.info("Starting GIF conversion and token metadata processing...", { chunks, chunkDuration });
+    logger.info("Starting JPEG extraction and token metadata processing...", { chunks, chunkDuration });
     
     for (let i = 0; i < chunks; i++) {
       const startTime = i * chunkDuration;
       const endTime = startTime + chunkDuration;
-      const outputGifPath = path.join(tempDir, `chunk-${i}.gif`);
+      const outputImagePath = path.join(tempDir, `chunk-${i}.jpg`);
       logger.info(`Processing chunk ${i + 1}/${chunks}`, { startTime, duration: chunkDuration });
       
       try {
-        // Convert chunk to GIF
+        // Extract single JPEG frame
         const ffmpegArgs = [
           "-i", videoPath,
           "-ss", startTime.toFixed(3),
-          "-t", chunkDuration.toFixed(3),
-          "-vf", "fps=5,scale=320:-1:flags=fast_bilinear",
+          "-vframes", "1",
+          "-vf", "scale=320:-1:flags=fast_bilinear",
           "-y",
-          outputGifPath,
+          outputImagePath,
         ];
         
         await new Promise((resolve, reject) => {
           const process = child_process.spawn('ffmpeg', ffmpegArgs);
           process.on("close", (code) => {
             if (code === 0) {
-              logger.info(`Chunk ${i + 1} converted to GIF successfully`, { outputGifPath });
+              logger.info(`Chunk ${i + 1} extracted successfully`, { outputImagePath });
               resolve();
             } else {
               logger.error(`ffmpeg exited with code ${code} for chunk ${i + 1}`);
@@ -495,9 +495,9 @@ export const extractTask = schemaTask({
           });
         });
 
-        // Upload GIF to IPFS
-        const fileName = `chunk-${i}.gif`;
-        const ipfsResult = await uploadToIPFS(outputGifPath, fileName);
+        // Upload JPEG to IPFS
+        const fileName = `chunk-${i}.jpg`;
+        const ipfsResult = await uploadToIPFS(outputImagePath, fileName);
         logger.info(`Chunk ${i + 1} uploaded to IPFS`, ipfsResult);
 
         // Calculate score for this chunk based on period overlaps
@@ -508,7 +508,7 @@ export const extractTask = schemaTask({
           name: `StreamMint Token #${i}`,
           description: "A time-based segment from a StreamMint video with quality score",
           image: `ipfs://${ipfsResult.ipfsHash}`,
-          animation_url: `ipfs://${ipfsResult.ipfsHash}`,
+          animation_url: `ipfs://${ipfsResult.ipfsHash}`, 
           attributes: [
             {
               trait_type: "Start Time",
@@ -551,7 +551,7 @@ export const extractTask = schemaTask({
         
         // Add to items array
         items.push({
-          gifHash: ipfsResult.ipfsHash,
+          imageHash: ipfsResult.ipfsHash,
           start: startTime,
           end: endTime,
           score: chunkScore,
@@ -561,7 +561,7 @@ export const extractTask = schemaTask({
         
         logger.info(`Chunk ${i + 1} fully processed`, { 
           tokenId: i,
-          gifHash: ipfsResult.ipfsHash,
+          imageHash: ipfsResult.ipfsHash,
           metadataHash: jsonUploadResult.ipfsHash,
           tokenURI
         });
