@@ -25,7 +25,7 @@ The result is an end-to-end, hackathon-ready proof-of-concept that showcases cus
 
 ## Demo
 
-The project demo is available [here](https://eb5af317.stream-mint.pages.dev/).
+The project demo is available [here](https://stream-mint.pages.dev/).
 
 ## How it's made
 
