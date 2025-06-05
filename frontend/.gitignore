@@ -39,3 +39,5 @@ tsconfig.tsbuildinfo
 .next
 next-env.d.ts
 tamagui.css
+
+/out

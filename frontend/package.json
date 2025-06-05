@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "export": "next build && next export",
+    "start": "npx serve@latest out",
+    "export": "next build",
     "generate:icons": "xzkui-icons generate -i ./raw-icons -o ./src/icons",
     "generate:tokens": "xzkui-tokens generate -t tamagui -i ./raw-tokens -o ./src/config/tokens -p"
   },
@@ -46,6 +46,7 @@
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "catalog:",
     "react-native": "*",
+    "serve": "^14.2.1",
     "svgo": "^3.0.0",
     "typescript": "catalog:",
     "typescript-eslint": "catalog:typescript-eslint"

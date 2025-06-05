@@ -14,14 +14,14 @@ const plugins = [
 export default () => {
   /** @type {import('next').NextConfig} */
   let config = {
-    // output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
+    output: 'export',
+    trailingSlash: true,
     eslint: {
       ignoreDuringBuilds: true,
     },
     typescript: {
       ignoreBuildErrors: true,
     },
-
     transpilePackages: ['react-native-web'],
     reactStrictMode: true,
     images: {

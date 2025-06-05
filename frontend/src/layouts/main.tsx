@@ -1,6 +1,5 @@
 'use client';
 
-import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { ArrowLeft } from '@xsolla-zk/icons';
 import { NavBar, RichIcon, View } from '@xsolla-zk/react';
 import dynamic from 'next/dynamic';
@@ -18,6 +17,13 @@ const pageMappings: Record<string, string> = {
 
 const DynamicToggleThemeButton = dynamic(
   () => import('~/interface/toggle-theme-button').then((mod) => mod.ToggleThemeButton),
+  {
+    ssr: false,
+  },
+);
+
+const DynamicConnectButton = dynamic(
+  () => import('@rainbow-me/rainbowkit').then((mod) => ({ default: mod.ConnectButton })),
   {
     ssr: false,
   },
@@ -52,7 +58,7 @@ export function MainLayout({ children }: { children: ReactNode }) {
           <NavBar.Title>{pageMappings[pathname]}</NavBar.Title>
         </NavBar.Center>
         <NavBar.EndSlot>
-          <ConnectButton />
+          <DynamicConnectButton />
           <DynamicToggleThemeButton />
         </NavBar.EndSlot>
       </NavBar>

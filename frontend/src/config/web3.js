@@ -26,5 +26,5 @@ export const config = getDefaultConfig({
   appName: 'Stream Mint App',
   projectId: 'a5f4d6b34a9ed736ba968cff04c1d811', // Replace with your WalletConnect project ID
   chains: [xsollaZkSepoliaTestnet],
-  ssr: true,
+  ssr: false,
 });

@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react';
 import { SemanticText, Stack, Button } from '@xsolla-zk/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useNFTContractMetadata, useMintNFT } from '~/contracts/hooks';
 import { ContentStack } from '~/components/stacks/content-stack';
 import { NFTToken } from './components/nft-token';
 
-export default function CollectionPage() {
+function CollectionPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const contractAddress = searchParams.get('address');
@@ -159,5 +159,17 @@ export default function CollectionPage() {
         </Stack>
       )}
     </Stack>
+  );
+}
+
+export default function CollectionPage() {
+  return (
+    <Suspense fallback={
+      <ContentStack>
+        <SemanticText variant="headerM">Loading Collection...</SemanticText>
+      </ContentStack>
+    }>
+      <CollectionPageContent />
+    </Suspense>
   );
 } 
