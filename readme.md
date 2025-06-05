@@ -23,10 +23,13 @@ The result is an end-to-end, hackathon-ready proof-of-concept that showcases cus
 
 (\*): For the purposes of the prototype implementation I had to step out from the full decentralisation, particularly with the custom oracle solution which is suitable for demonstration but would need significant improvements for production use.
 
+## Demo
+
+The project demo is available [here](https://eb5af317.stream-mint.pages.dev/).
+
 ## How it's made
 
 - The project solely works on Xsolla ZK blockchain
 - The Xsolla ZK starter kit was used for smart contract & Xsolla ZK UI kit for the frontend development
 - Address of deployed Smart Mint NFT Factory contract is `0x77E17D9Ba79079B6377A1F5b69c3b5611c5D0939` (see in the [explorer](https://x.la/explorer/address/0x77E17D9Ba79079B6377A1F5b69c3b5611c5D0939))
 - The project uses Trigger.dev for running video processing tasks
-- The project demo is available via https://???
