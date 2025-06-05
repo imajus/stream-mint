@@ -31,5 +31,5 @@ The project demo is available [here](https://eb5af317.stream-mint.pages.dev/).
 
 - The project solely works on Xsolla ZK blockchain
 - The Xsolla ZK starter kit was used for smart contract & Xsolla ZK UI kit for the frontend development
-- Address of deployed Smart Mint NFT Factory contract is `0x77E17D9Ba79079B6377A1F5b69c3b5611c5D0939` (see in the [explorer](https://x.la/explorer/address/0x77E17D9Ba79079B6377A1F5b69c3b5611c5D0939))
+- Address of deployed Smart Mint NFT Factory contract is `0x0b7b69Ab9a71c839E4817E12f1d9069d6d8d81bC` (see in the [explorer](https://x.la/explorer/address/0x0b7b69Ab9a71c839E4817E12f1d9069d6d8d81bC))
 - The project uses Trigger.dev for running video processing tasks
