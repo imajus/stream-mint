@@ -23,7 +23,6 @@
     "next": "catalog:next15",
     "react": "*",
     "react-dom": "*",
-    "react-native": "*",
     "react-native-web": "^0.20.0",
     "viem": "^2.30.6",
     "wagmi": "^2.15.5"
