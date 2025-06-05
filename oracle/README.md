@@ -1,120 +1,106 @@
-# Flare Hardhat Starter Kit
+# Stream Mint Oracle
 
-This is a starter kit for interacting with Flare blockchain.
-It provides example code for interacting with enshrined Flare protocol, and useful deployed contracts.
-It also demonstrates, how the official Flare smart contract periphery [package](https://www.npmjs.com/package/@flarenetwork/flare-periphery-contracts) can be used in your projects.
+## Overview
 
-## Getting started
+Stream Mint Oracle is a blockchain-based video processing service that automatically downloads, processes, and transforms video content into time-segmented NFTs. This oracle service acts as a bridge between video content and blockchain, creating unique NFT collections where each token represents a specific time segment of the original video.
 
-If you are new to Hardhat please check the [Hardhat getting started doc](https://hardhat.org/hardhat-runner/docs/getting-started#overview)
+## Key Features
 
-1. Clone and install dependencies:
+### 🎥 Video Processing
 
-   ```console
-   git clone https://github.com/flare-foundation/flare-hardhat-starter.git
-   cd flare-hardhat-starter
-   ```
+- **Automated Video Download**: Downloads videos from external URLs using optimized streaming techniques
+- **Intelligent Chunking**: Splits videos into equal time segments for tokenization
+- **Quality Analysis**: Evaluates each segment using custom scoring algorithms
+- **Multi-format Support**: Handles various video formats with WebM output optimization
 
-   and then run:
+### 🔗 Blockchain Integration
 
-   ```console
-   yarn
-   ```
+- **Smart Contract Interaction**: Reads metadata from StreamMintNFT contracts on Xsolla ZK Sepolia Testnet
+- **Automated Token URI Setting**: Programmatically assigns metadata URIs to NFT tokens
+- **Quality-based Minting**: Uses content analysis to determine segment quality scores
 
-   or
+### 📁 IPFS Storage
 
-   ```console
-   npm install
-   ```
+- **Decentralized Storage**: Uploads video segments and metadata to IPFS via Pinata
+- **Dual Asset Creation**: Generates both JPEG thumbnails and WebM video segments
+- **Metadata Management**: Creates comprehensive NFT metadata with attributes and external links
 
-2. Set up `.env` file
+### ⚡ Automation & Performance
 
-   ```console
-   mv .env.example .env
-   ```
+- **Trigger.dev Integration**: Serverless task execution with configurable timeouts
+- **Parallel Processing**: Concurrent blockchain transactions for optimal performance
+- **Error Handling**: Robust error recovery and transaction monitoring
 
-3. Change the `PRIVATE_KEY` in the `.env` file to yours
+## Technical Architecture
 
-4. Compile the project
+### Dependencies
 
-   ```console
-   yarn hardhat compile
-   ```
+- **Video Processing**: FFmpeg integration for video manipulation
+- **Blockchain**: Viem for Ethereum client operations
+- **Storage**: IPFS integration via Pinata API
+- **Automation**: Trigger.dev for serverless execution
+- **File Management**: fs-extra for enhanced file operations
 
-   or
+### Environment Requirements
 
-   ```console
-   npx hardhat compile
-   ```
+- `PINATA_JWT`: Pinata API access token for IPFS uploads
+- `PRIVATE_KEY`: Ethereum private key for blockchain transactions
+- `CURL_TIMEOUT`: Download timeout configuration (default: 3 hours)
+- `SCORE_THRESHOLD`: Quality scoring threshold (default: 0.3)
 
-   This will compile all `.sol` files in your `/contracts` folder.
-   It will also generate artifacts that will be needed for testing.
-   Contracts `Imports.sol` import MockContracts and Flare related mocks, thus enabling mocking of the contracts from typescript.
+### Processing Workflow
 
-5. Run Tests
+1. **Contract Reading**: Extracts video URL and metadata from StreamMintNFT contract
+2. **Video Download**: Downloads source video using libcurl with proxy support
+3. **Content Analysis**: Fetches quality periods data from external API
+4. **Segmentation**: Splits video into equal-duration chunks
+5. **Asset Generation**: Creates JPEG thumbnails and WebM segments for each chunk
+6. **IPFS Upload**: Stores all assets on decentralized storage
+7. **Metadata Creation**: Generates comprehensive NFT metadata with quality scores
+8. **Blockchain Update**: Updates contract with tokenURI for each segment
 
-   ```console
-   yarn hardhat test
-   ```
+## Smart Contract Integration
 
-   or
+The oracle works with StreamMintNFT contracts that expose:
 
-   ```console
-   npx hardhat test
-   ```
+- `videoUrl()`: Source video URL
+- `description()`: Collection description
+- `maxSupply()`: Maximum number of tokens
+- `setTokenURI(tokenId, uri)`: Updates individual token metadata
 
-6. Deploy
+## Quality Scoring
 
-   Check the `hardhat.config.ts` file, where you define which networks you want to interact with.
-   Flare mainnet & test network details are already added in that file.
+Each video segment receives a quality score based on:
 
-   Make sure that you have added API Keys in the `.env` file
+- **Time-based Analysis**: Overlap with high-quality periods
+- **Content Evaluation**: External API assessment
+- **Threshold Filtering**: Configurable quality standards
 
-   ```console
-   npx hardhat run scripts/tryDeployment.ts
-   ```
+## NFT Metadata Structure
 
-## Repository structure
+Each token includes:
 
-```
-├── contracts: Solidity smart contracts
-├── scripts: Typescript scripts that interact with the blockchain
-├── test
-├── hardhat.config.ts
-├── package.json
-├── README.md
-├── tsconfig.json
-└── yarn.lock
-```
+- **Visual Assets**: JPEG thumbnail and WebM video segment
+- **Temporal Attributes**: Start time, end time, duration
+- **Quality Metrics**: Calculated quality score
+- **External References**: Link to original video source
 
-## Contributing
+## Development
 
-Before opening a pull request, lint and format the code.
-You can do that by running the following commands.
+### Setup
 
-```sh
-yarn format:fix
+```bash
+npm install
 ```
 
-```sh
-yarn lint:fix
+### Development Mode
+
+```bash
+npm run dev
 ```
 
-## Clean repository
+### Deployment
 
-If you want to start building your projects from a repository that is already setup to work with Flare correctly, but you do not want to keep any of the examples, these are the files you should delete:
-
-- all files in the `contracts/` folder
-- all files in the `scripts/` folder, except for the `scripts/fdcExample/Base.ts` which might come in useful
-
-A shell command that does this is:
-
-```sh
-rm -rf contracts/* & mv scripts/fdcExample/Base.ts ./Base.ts & rm -rf scripts/* & mv ./Base.ts scripts/Base.ts
+```bash
+npm run deploy
 ```
-
-## Resources
-
-- [Flare Developer Hub](https://dev.flare.network/)
-- [Hardhat Guides](https://dev.flare.network/fdc/guides/hardhat)
-- [Hardhat Docs](https://hardhat.org/docs)
